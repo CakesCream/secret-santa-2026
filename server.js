@@ -1,67 +1,75 @@
 import express from "express";
 import crypto from "node:crypto";
-import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DATA_FILE = process.env.DATA_FILE || "./data.json";
 const ADMIN_KEY = process.env.ADMIN_KEY;
 
-app.use(express.json());
-app.use(express.static("public"));
+if (!ADMIN_KEY) {
+  throw new Error("ADMIN_KEY environment variable is required.");
+}
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const participants = ["Kaith", "Molly", "Tom", "Shin", "Mark", "Dad", "Mum"];
 
-function createDraw() {
-  let recipients;
-  do {
-    recipients = [...participants];
-    for (let i = recipients.length - 1; i > 0; i--) {
-      const j = crypto.randomInt(i + 1);
-      [recipients[i], recipients[j]] = [recipients[j], recipients[i]];
-    }
-  } while (recipients.some((name, i) => name === participants[i]));
+function hash(value) {
+  return crypto
+    .createHmac("sha256", ADMIN_KEY)
+    .update(value)
+    .digest("hex");
+}
+
+// A secret-key-based ordering creates a stable draw.
+// Assigning the next person in a circular order prevents self-assignments.
+const ordered = [...participants].sort((a, b) =>
+  hash("draw:" + a).localeCompare(hash("draw:" + b))
+);
+
+const entries = ordered.map((name, index) => {
+  const recipient = ordered[(index + 1) % ordered.length];
 
   return {
-    entries: participants.map((name, i) => ({
-      name,
-      recipient: recipients[i],
-      token: crypto.randomBytes(24).toString("hex")
-    }))
+    name,
+    recipient,
+    token: hash("link:" + name)
   };
-}
+});
 
-let draw;
-if (fs.existsSync(DATA_FILE)) {
-  draw = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
-} else {
-  draw = createDraw();
-  fs.writeFileSync(DATA_FILE, JSON.stringify(draw), { mode: 0o600 });
-}
+app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/api/reveal/:token", (req, res) => {
-  const entry = draw.entries.find(x => x.token === req.params.token);
-  if (!entry) return res.status(404).json({ error: "Invalid private link." });
+  const entry = entries.find(
+    item => item.token === req.params.token
+  );
+
+  if (!entry) {
+    return res.status(404).json({ error: "Invalid private link." });
+  }
 
   res.set("Cache-Control", "no-store");
-  res.json({ name: entry.name, recipient: entry.recipient });
+  res.json({
+    name: entry.name,
+    recipient: entry.recipient
+  });
 });
 
 app.get("/api/links", (req, res) => {
-  if (!ADMIN_KEY || req.get("x-admin-key") !== ADMIN_KEY)
-    return res.status(401).json({ error: "Unauthorized" });
+  if (req.get("x-admin-key") !== ADMIN_KEY) {
+    return res.status(401).json({ error: "Unauthorized." });
+  }
 
   const origin = `${req.protocol}://${req.get("host")}`;
+
   res.set("Cache-Control", "no-store");
-  res.json(draw.entries.map(({ name, token }) => ({
+
+  res.json(entries.map(({ name, token }) => ({
     name,
     link: `${origin}/?token=${token}`
   })));
 });
 
-app.get("*", (req, res) =>
-  res.sendFile(path.resolve("public/index.html"))
-);
-
-app.listen(PORT, () => console.log("Secret Santa is running!"));
+app.listen(PORT, () => {
+  console.log("Secret Santa 2026 is running!");
+});
