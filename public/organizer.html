@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Secret Santa Organizer</title>
+<style>
+body {
+  background:#173b30;
+  font-family:Arial,sans-serif;
+  padding:25px;
+  color:#26372f;
+}
+.card {
+  max-width:500px;
+  margin:50px auto;
+  background:#fbf5e9;
+  border-radius:20px;
+  padding:28px;
+}
+h1 {text-align:center;color:#173b30}
+input {
+  width:100%;
+  padding:13px;
+  box-sizing:border-box;
+  margin:12px 0;
+}
+button {
+  padding:12px;
+  background:#a84440;
+  color:white;
+  border:0;
+  border-radius:8px;
+  cursor:pointer;
+}
+.person {
+  padding:14px 0;
+  border-bottom:1px solid #ddd;
+}
+a {word-break:break-all}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>🎄 Organizer's Corner</h1>
+<p>Enter your private organizer key to retrieve the invitations.</p>
+
+<input id="key" type="password" placeholder="Enter ADMIN_KEY">
+
+<button onclick="getLinks()">Get invitation links</button>
+
+<div id="message"></div>
+<div id="links"></div>
+</div>
+
+<script>
+async function getLinks() {
+  const key = document.getElementById("key").value;
+  const message = document.getElementById("message");
+  const output = document.getElementById("links");
+
+  message.textContent = "Loading invitations...";
+  output.innerHTML = "";
+
+  try {
+    const response = await fetch("/api/links", {
+      headers: {"x-admin-key": key},
+      cache: "no-store"
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error("Incorrect key.");
+
+    message.textContent = "Your seven invitations are ready! 🎁";
+
+    data.forEach(person => {
+      const item = document.createElement("div");
+      item.className = "person";
+
+      const name = document.createElement("strong");
+      name.textContent = person.name;
+
+      const link = document.createElement("p");
+      const anchor = document.createElement("a");
+      anchor.href = person.link;
+      anchor.textContent = "Open invitation";
+      link.appendChild(anchor);
+
+      const copy = document.createElement("button");
+      copy.textContent = "Copy private link";
+      copy.onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(person.link);
+          copy.textContent = "Copied!";
+        } catch {
+          prompt("Copy this private link:", person.link);
+        }
+      };
+
+      item.append(name, link, copy);
+      output.appendChild(item);
+    });
+  } catch (error) {
+    message.textContent = error.message;
+  }
+}
+</script>
+</body>
+</html>
