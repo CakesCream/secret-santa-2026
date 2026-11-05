@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Secret Santa 2026 🎄</title>
+<style>
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg,#102c24,#245644);
+  font-family: Arial, sans-serif;
+  padding: 20px;
+}
+.card {
+  background: #fbf5e9;
+  border-radius: 25px;
+  padding: 35px 25px;
+  text-align: center;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 15px 50px #0005;
+}
+h1 { color: #173b30; font-size: 42px; }
+.tree { font-size: 65px; }
+p { color: #68736a; line-height: 1.6; }
+button {
+  background: #a84440;
+  color: white;
+  border: 0;
+  border-radius: 12px;
+  padding: 18px;
+  width: 100%;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.recipient {
+  color: #a84440;
+  font-size: 38px;
+  font-weight: bold;
+  margin: 20px;
+}
+.hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="tree">🎄</div>
+  <h1>Secret Santa 2026</h1>
+  <p>A little Christmas magic is waiting for you!</p>
+
+  <div id="welcome">
+    <p id="person">Your surprise is ready...</p>
+    <button onclick="reveal()">🎁 REVEAL MY PERSON</button>
+    <p>Remember... shhh! It's a secret 🤫</p>
+  </div>
+
+  <div id="result" class="hidden">
+    <p>You are the Secret Santa for:</p>
+    <div class="recipient" id="recipient"></div>
+    <p>Happy gift hunting! ❤️</p>
+  </div>
+
+  <p id="error"></p>
+</div>
+
+<script>
+async function reveal() {
+  const token = new URLSearchParams(location.search).get("token");
+  if (!token) {
+    document.getElementById("error").textContent =
+      "Please open your personal invitation link!";
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/reveal/" + encodeURIComponent(token));
+    const data = await response.json();
+
+    if (!response.ok) throw new Error(data.error);
+
+    document.getElementById("person").textContent =
+      "Hello, " + data.name + "!";
+
+    document.getElementById("recipient").textContent =
+      data.recipient;
+
+    document.getElementById("welcome").classList.add("hidden");
+    document.getElementById("result").classList.remove("hidden");
+    history.replaceState({}, "", location.pathname);
+  } catch (error) {
+    document.getElementById("error").textContent =
+      "Something went wrong. Please try again.";
+  }
+}
+</script>
+</body>
+</html>
